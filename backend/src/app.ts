@@ -3,6 +3,7 @@ import cors from 'cors';
 import { env } from './lib/env';
 import { errorHandler } from './middleware/errorHandler';
 import { uploadRouter } from './api/upload';
+import { filtrosRouter } from './api/filtros';
 
 export const app = express();
 
@@ -14,5 +15,6 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api', uploadRouter);
+app.use('/api', filtrosRouter);
 
 app.use(errorHandler);
