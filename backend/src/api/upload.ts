@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { RequestHandler } from 'express';
 import multer from 'multer';
 import { AppError } from '../lib/errors';
 import { uploadStore } from '../coredb/upload';
 
-const upload = multer({
+export const uploadMiddleware = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 30 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
@@ -13,11 +13,9 @@ const upload = multer({
     }
     cb(null, true);
   },
-});
+}).single('arquivo');
 
-export const uploadRouter = Router();
-
-uploadRouter.post('/upload', upload.single('arquivo'), async (req, res, next) => {
+export const uploadHandler: RequestHandler = async (req, res, next) => {
   try {
     if (!req.file) {
       throw new AppError('Nenhum arquivo enviado. Envie um campo "arquivo" multipart/form-data.');
@@ -27,4 +25,4 @@ uploadRouter.post('/upload', upload.single('arquivo'), async (req, res, next) =>
   } catch (err) {
     next(err);
   }
-});
+};

@@ -2,10 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './lib/env';
 import { errorHandler } from './middleware/errorHandler';
-import { uploadRouter } from './api/upload';
-import { filtrosRouter } from './api/filtros';
-import { seriesRouter } from './api/series';
-import { rankingRouter } from './api/ranking';
+import { uploadHandler, uploadMiddleware } from './api/upload';
+import { filtrosHandler } from './api/filtros';
+import { seriesHandler } from './api/series';
+import { rankingHandler } from './api/ranking';
+import { indicadoresHandler } from './api/indicadores';
 
 export const app = express();
 
@@ -16,9 +17,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.use('/api', uploadRouter);
-app.use('/api', filtrosRouter);
-app.use('/api', seriesRouter);
-app.use('/api', rankingRouter);
+// Todas as rotas da API registradas aqui, num lugar só (ver README, decisões de arquitetura).
+app.post('/api/upload', uploadMiddleware, uploadHandler);
+app.get('/api/filtros', filtrosHandler);
+app.get('/api/series', seriesHandler);
+app.get('/api/ranking', rankingHandler);
+app.get('/api/indicadores', indicadoresHandler);
 
 app.use(errorHandler);
