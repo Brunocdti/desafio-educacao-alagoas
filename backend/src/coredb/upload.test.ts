@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
-import { csvRowSchema, processarUpload } from './upload';
+import { csvRowSchema, uploadStore } from './upload';
 
 const CABECALHO = 'co_mun,no_mun,ano,fonte,variavel,ensino_rede,ensino_tipo,valor';
 
@@ -121,9 +121,9 @@ describe('csvRowSchema', () => {
   });
 });
 
-describe('processarUpload — os 5 casos da seção 3.1', () => {
+describe('uploadStore.processarUpload — os 5 casos da seção 3.1', () => {
   it('1) CSV correto e completo é importado', async () => {
-    const resumo = await processarUpload(csv(LINHA_VALIDA));
+    const resumo = await uploadStore.processarUpload(csv(LINHA_VALIDA));
     expect(resumo.linhasLidas).toBe(1);
     expect(resumo.linhasImportadas).toBe(1);
     expect(resumo.linhasRejeitadas).toBe(0);
@@ -138,12 +138,12 @@ describe('processarUpload — os 5 casos da seção 3.1', () => {
       'utf8',
     );
 
-    await expect(processarUpload(cabecalhoErrado)).rejects.toThrow(AppError);
+    await expect(uploadStore.processarUpload(cabecalhoErrado)).rejects.toThrow(AppError);
     expect(await prisma.medida.count()).toBe(0);
   });
 
   it('3) CSV com cabeçalho certo e zero linhas de dados não é erro', async () => {
-    const resumo = await processarUpload(Buffer.from(CABECALHO, 'utf8'));
+    const resumo = await uploadStore.processarUpload(Buffer.from(CABECALHO, 'utf8'));
     expect(resumo.linhasLidas).toBe(0);
     expect(resumo.linhasImportadas).toBe(0);
     expect(resumo.linhasRejeitadas).toBe(0);
@@ -151,12 +151,12 @@ describe('processarUpload — os 5 casos da seção 3.1', () => {
 
   it('4) arquivo .txt disfarçado de .csv é rejeitado na validação de cabeçalho', async () => {
     const textoQualquer = Buffer.from('isso aqui não é um csv\nsó um texto qualquer', 'utf8');
-    await expect(processarUpload(textoQualquer)).rejects.toThrow(AppError);
+    await expect(uploadStore.processarUpload(textoQualquer)).rejects.toThrow(AppError);
   });
 
   it('5) reenviar o mesmo arquivo substitui os dados em vez de duplicar', async () => {
-    await processarUpload(csv(LINHA_VALIDA));
-    await processarUpload(csv(LINHA_VALIDA));
+    await uploadStore.processarUpload(csv(LINHA_VALIDA));
+    await uploadStore.processarUpload(csv(LINHA_VALIDA));
 
     const total = await prisma.medida.count();
     expect(total).toBe(1); // e não 2
@@ -165,7 +165,7 @@ describe('processarUpload — os 5 casos da seção 3.1', () => {
   it('conta e reporta linhas inválidas sem derrubar a importação inteira', async () => {
     const linhaInvalida =
       '2704302,Maceió,9999,censo_escolar,Matrícula,Total,Ensino Fundamental,109026.0';
-    const resumo = await processarUpload(csv(LINHA_VALIDA, linhaInvalida));
+    const resumo = await uploadStore.processarUpload(csv(LINHA_VALIDA, linhaInvalida));
 
     expect(resumo.linhasLidas).toBe(2);
     expect(resumo.linhasImportadas).toBe(1);
