@@ -7,6 +7,7 @@ import { filtrosHandler } from './api/filtros';
 import { seriesHandler } from './api/series';
 import { rankingHandler } from './api/ranking';
 import { indicadoresHandler } from './api/indicadores';
+import { dadosHandler } from './api/dados';
 
 export const app = express();
 
@@ -23,5 +24,6 @@ app.get('/api/filtros', filtrosHandler);
 app.get('/api/series', seriesHandler);
 app.get('/api/ranking', rankingHandler);
 app.get('/api/indicadores', indicadoresHandler);
+app.get('/api/dados', dadosHandler);
 
 app.use(errorHandler);
