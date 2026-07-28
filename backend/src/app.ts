@@ -5,6 +5,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { uploadRouter } from './api/upload';
 import { filtrosRouter } from './api/filtros';
 import { seriesRouter } from './api/series';
+import { rankingRouter } from './api/ranking';
 
 export const app = express();
 
@@ -18,5 +19,6 @@ app.get('/health', (_req, res) => {
 app.use('/api', uploadRouter);
 app.use('/api', filtrosRouter);
 app.use('/api', seriesRouter);
+app.use('/api', rankingRouter);
 
 app.use(errorHandler);
