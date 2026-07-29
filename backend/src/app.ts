@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
 import { env } from './lib/env';
 import { errorHandler } from './middleware/errorHandler';
+import { openapiSpec } from './lib/openapiSpec';
 import { uploadHandler, uploadMiddleware } from './api/upload';
 import { filtrosHandler } from './api/filtros';
 import { seriesHandler } from './api/series';
@@ -17,6 +19,11 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.get('/openapi.json', (_req, res) => {
+  res.json(openapiSpec);
+});
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 // Todas as rotas da API registradas aqui, num lugar só (ver README, decisões de arquitetura).
 app.post('/api/upload', uploadMiddleware, uploadHandler);

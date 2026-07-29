@@ -18,9 +18,9 @@ upload manualmente sem precisar do arquivo completo (145 mil linhas) em mãos.
 
 ## Status
 
-Backend completo: upload com validação/streaming, e os 5 endpoints de agregação
-(`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`). Frontend
-ainda não iniciado.
+Backend completo: upload com validação/streaming, os 5 endpoints de agregação
+(`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`) e documentação
+OpenAPI/Swagger em `/docs`. Frontend ainda não iniciado.
 
 ## Como rodar o backend do zero
 
@@ -43,6 +43,9 @@ curl http://localhost:3333/health
 # depois de subir a API, envie o CSV pelo endpoint de upload:
 curl -X POST http://localhost:3333/api/upload -F "arquivo=@../educacao_alagoas_amostra.csv"
 ```
+
+Documentação interativa da API (Swagger UI): `http://localhost:3333/docs`. Spec crua em
+`http://localhost:3333/openapi.json`.
 
 Outros comandos úteis (dentro de `backend/`):
 
@@ -161,7 +164,7 @@ necessidade técnica; vale o registro para ser honesto sobre o motivo real da mu
 - Frontend (React + Vite + Tailwind) — próxima etapa.
 - Mapa coroplético, escolas individuais e outros enriquecimentos com dados externos — avaliar se
   sobra tempo depois do núcleo (frontend) estar pronto.
-- Swagger/OpenAPI, GitHub Actions e deploy público — ainda não feitos.
+- GitHub Actions e deploy público — ainda não feitos.
 
 ## Licença
 
