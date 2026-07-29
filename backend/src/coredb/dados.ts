@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
+import { TODAS_VARIAVEIS } from '../lib/dominio';
 import { DadosStore, ItemDado } from '../core/dados';
 
 /**
@@ -10,6 +12,10 @@ import { DadosStore, ItemDado } from '../core/dados';
  */
 export const dadosStore: DadosStore = {
   async obterDados(params) {
+    if (params.variavel && !TODAS_VARIAVEIS.includes(params.variavel)) {
+      throw new AppError(`variavel desconhecida: ${params.variavel}`);
+    }
+
     const where: Prisma.MedidaWhereInput = {
       ...(params.municipio ? { coMun: { in: params.municipio } } : {}),
       ...(params.rede ? { ensinoRede: params.rede } : {}),
