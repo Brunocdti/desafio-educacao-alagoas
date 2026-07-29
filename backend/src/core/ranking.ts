@@ -2,7 +2,7 @@ import { FiltroBase } from '../lib/filtroQuery';
 
 export interface ItemRanking {
   coMun: string;
-  municipio: string;
+  noMun: string;
   valor: number;
 }
 

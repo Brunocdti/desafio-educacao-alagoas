@@ -18,11 +18,14 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
 
   if (err instanceof MulterError) {
-    res.status(400).json({ erro: `Falha no upload: ${err.message}` });
+    const mensagem =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'Arquivo excede o limite de 30MB.'
+        : `Falha no upload: ${err.message}`;
+    res.status(400).json({ erro: mensagem });
     return;
   }
 
-  // eslint-disable-next-line no-console
   console.error(err);
   res.status(500).json({ erro: 'Erro interno do servidor.' });
 };

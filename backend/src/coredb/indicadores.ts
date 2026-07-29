@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { VARIAVEL_MATRICULA, redeEfetiva } from '../lib/dominio';
-import { filtroAnoIntervalo, filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
+import { filtroAno, filtroAnoIntervalo, filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
 import { FiltroBase } from '../lib/filtroQuery';
 import { Indicadores, IndicadoresStore } from '../core/indicadores';
 
@@ -12,7 +12,7 @@ async function mediaPonderada(
   filtro: FiltroBase,
 ): Promise<number | null> {
   const clausulas = Prisma.join(
-    [filtroMunicipios(filtro.municipio), filtroRede(rede), filtroEtapa(filtro.etapa)],
+    [filtroMunicipios(filtro.municipio), filtroRede(rede), filtroEtapa(filtro.etapa), filtroAno(ano)],
     ' ',
   );
   const rows = await prisma.$queryRaw<{ valor: number | null }[]>(Prisma.sql`
@@ -25,7 +25,7 @@ async function mediaPonderada(
      AND mat.ensino_tipo = m.ensino_tipo
      AND mat.fonte = 'censo_escolar'
      AND mat.variavel = ${VARIAVEL_MATRICULA}
-    WHERE m.variavel = ${variavel} AND m.ano = ${ano}
+    WHERE m.variavel = ${variavel}
       ${clausulas}
   `);
   return rows[0]?.valor ?? null;
@@ -37,13 +37,13 @@ async function somaMatriculas(
   filtro: FiltroBase,
 ): Promise<number | null> {
   const clausulas = Prisma.join(
-    [filtroMunicipios(filtro.municipio), filtroRede(rede), filtroEtapa(filtro.etapa)],
+    [filtroMunicipios(filtro.municipio), filtroRede(rede), filtroEtapa(filtro.etapa), filtroAno(ano)],
     ' ',
   );
   const rows = await prisma.$queryRaw<{ valor: number | null }[]>(Prisma.sql`
     SELECT SUM(m.valor)::float8 AS valor
     FROM medida m
-    WHERE m.variavel = ${VARIAVEL_MATRICULA} AND m.ano = ${ano}
+    WHERE m.variavel = ${VARIAVEL_MATRICULA}
       ${clausulas}
   `);
   return rows[0]?.valor ?? null;
@@ -85,9 +85,14 @@ export const indicadoresStore: IndicadoresStore = {
         prisma.$queryRaw<{ valor: number | null }[]>(Prisma.sql`
           SELECT SUM(m.valor)::float8 AS valor
           FROM medida m
-          WHERE m.variavel = 'Escolas' AND m.ano = ${anoReferencia}
+          WHERE m.variavel = 'Escolas'
             ${Prisma.join(
-              [filtroMunicipios(filtro.municipio), filtroRede(redeEducacional), filtroEtapa(filtro.etapa)],
+              [
+                filtroMunicipios(filtro.municipio),
+                filtroRede(redeEducacional),
+                filtroEtapa(filtro.etapa),
+                filtroAno(anoReferencia),
+              ],
               ' ',
             )}
         `),

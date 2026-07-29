@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { TODAS_VARIAVEIS, VARIAVEIS_PERCENTUAL, VARIAVEL_MATRICULA, redeEfetiva } from '../lib/dominio';
-import { filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
+import { filtroAno, filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
 import { ItemRanking, RankingStore } from '../core/ranking';
 
 export const rankingStore: RankingStore = {
@@ -13,14 +13,19 @@ export const rankingStore: RankingStore = {
 
     const rede = redeEfetiva(variavel, params.rede);
     const clausulas = Prisma.join(
-      [filtroMunicipios(params.municipio), filtroRede(rede), filtroEtapa(params.etapa)],
+      [
+        filtroMunicipios(params.municipio),
+        filtroRede(rede),
+        filtroEtapa(params.etapa),
+        filtroAno(params.ano),
+      ],
       ' ',
     );
 
     if (VARIAVEIS_PERCENTUAL.has(variavel)) {
       return prisma.$queryRaw<ItemRanking[]>(Prisma.sql`
         SELECT m.co_mun AS "coMun",
-               m.no_mun AS municipio,
+               m.no_mun AS "noMun",
                (SUM(m.valor * COALESCE(mat.valor, 1)) / NULLIF(SUM(COALESCE(mat.valor, 1)), 0))::float8 AS valor
         FROM medida m
         LEFT JOIN medida mat
@@ -31,7 +36,6 @@ export const rankingStore: RankingStore = {
          AND mat.fonte = 'censo_escolar'
          AND mat.variavel = ${VARIAVEL_MATRICULA}
         WHERE m.variavel = ${variavel}
-          AND m.ano = ${params.ano}
           ${clausulas}
         GROUP BY m.co_mun, m.no_mun
         ORDER BY valor DESC
@@ -40,10 +44,9 @@ export const rankingStore: RankingStore = {
     }
 
     return prisma.$queryRaw<ItemRanking[]>(Prisma.sql`
-      SELECT m.co_mun AS "coMun", m.no_mun AS municipio, SUM(m.valor)::float8 AS valor
+      SELECT m.co_mun AS "coMun", m.no_mun AS "noMun", SUM(m.valor)::float8 AS valor
       FROM medida m
       WHERE m.variavel = ${variavel}
-        AND m.ano = ${params.ano}
         ${clausulas}
       GROUP BY m.co_mun, m.no_mun
       ORDER BY valor DESC
