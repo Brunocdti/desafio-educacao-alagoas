@@ -14,13 +14,17 @@ upload manualmente sem precisar do arquivo completo (145 mil linhas) em mãos.
 ## Estrutura
 
 - `backend/` — API Node.js + Express + TypeScript + Prisma (Postgres)
-- `frontend/` — React + TypeScript + Vite + Tailwind CSS *(em desenvolvimento)*
+- `frontend/` — React + TypeScript + Vite + Tailwind CSS
 
 ## Status
 
-Backend completo: upload com validação/streaming, os 5 endpoints de agregação
-(`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`) e documentação
-OpenAPI/Swagger em `/docs`. Frontend ainda não iniciado.
+Núcleo completo, ponta a ponta: upload com validação/streaming, os 5 endpoints de agregação
+(`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`), documentação
+OpenAPI/Swagger em `/docs`, e o dashboard no frontend (upload, filtros globais, 4 cards de
+indicadores, os 3 gráficos obrigatórios — série temporal, ranking entre municípios e quebra por
+rede de ensino — e a tabela paginada). Validado com um arquivo sintético de ~145 mil linhas (ver
+seção "Validação em escala" abaixo). Faltam só os diferenciais opcionais: CI, deploy público e
+enriquecimento com dados externos (mapa, etc.).
 
 ## Como rodar o backend do zero
 
@@ -56,6 +60,23 @@ Outros comandos úteis (dentro de `backend/`):
 - `npm run lint` — ESLint.
 - `npm run typecheck` — `tsc --noEmit`.
 - `npm run build` — compila para `dist/`.
+
+## Como rodar o frontend do zero
+
+Com o backend já rodando em `http://localhost:3333` (seção acima):
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # VITE_API_URL já vem apontando pro backend local
+npm run dev             # sobe em http://localhost:5173
+```
+
+Abra `http://localhost:5173`, suba o `educacao_alagoas_amostra.csv` pela tela de upload e use os
+filtros — todo o resto do dashboard (cards, gráficos, tabela) reage ao filtro global.
+
+Outros comandos (dentro de `frontend/`): `npm run lint` (oxlint) e `npm run build` (`tsc -b` +
+build de produção do Vite).
 
 ## Decisões sobre tratamento dos dados
 
@@ -142,6 +163,61 @@ concatenação de string), com um índice composto em `(ano, variavel, ensino_re
 Trazer a base completa (145 mil linhas) inteira para o Node agregar em array não escalaria nem
 manteria as respostas rápidas.
 
+## Decisões de interface
+
+**Estrutura por feature no frontend.** `src/features/{upload,filtros,indicadores,series,ranking,
+quebraRede,dados}/`, cada uma com `components/` e `hooks/` (o hook chama a API via React Query —
+é o equivalente React ao `services/` do Angular/GRC-FRONT). Estado do filtro global fica num
+único store Zustand (`store/filtrosStore.ts`); um hook derivado (`useFiltrosParams`) traduz esse
+estado pros parâmetros de query que cada endpoint espera, então todo componente deriva do mesmo
+lugar em vez de duplicar lógica de filtro.
+
+**Paleta e método dos gráficos.** Os 3 gráficos obrigatórios usam uma única cor de destaque
+(azul) validada por script de contraste/daltonismo antes de ir pro código — nenhum dos três
+precisa de mais de uma cor de identidade (ranking e quebra por rede são categorias no eixo, não
+séries concorrentes; a série temporal é uma linha só). Cor, espaçamento de barra, e a regra de
+nunca desenhar borda ao redor de marca (usar espaço em branco pra separar) seguem um guia interno
+de visualização de dados que seguí à risca antes de escrever a primeira linha de gráfico.
+Direct labels (valor no topo da barra, valor mais recente da série em destaque) em vez de rótulo
+em cada ponto; tooltip ao passar o mouse em todos os três.
+
+**Paleta Indigo/Blue/Slate, sem dark mode.** A primeira versão usava uma paleta genérica e
+respondia automaticamente ao tema do sistema operacional (`prefers-color-scheme`). Troquei pra uma
+paleta inspirada no meu projeto GRC-FRONT (Indigo-600 nos botões, Blue-500 nos gráficos,
+Slate nos textos/bordas, superfície branca) por dois motivos: fica mais parecido com o que eu uso
+no dia a dia, e o próprio GRC-FRONT não tem modo escuro — copiei essa simplicidade de propósito em
+vez de manter uma implementação de dark mode não testada e inconsistente com a referência.
+
+**React Query + Zustand.** React Query cuida de cache/loading/erro de cada chamada de API
+(inclusive mantendo o gráfico anterior visível, em vez de piscar um estado de carregando, quando
+o filtro muda — `placeholderData`). Zustand só guarda os 5 campos do filtro global; não tem
+Redux nem Context API caseiro.
+
+## Validação em escala
+
+O arquivo de amostra tem 3.534 linhas; a avaliação vai usar a base completa (145.028 linhas,
+13MB). Antes de considerar o projeto pronto, gerei um CSV sintético de 144.894 linhas (41 cópias
+dos 10 municípios da amostra, cada uma com um `co_mun` sintético) e testei os 5 endpoints contra
+ele. Isso revelou dois problemas reais que não apareciam com a amostra pequena:
+
+1. **`/api/series` ignorava o filtro de ano.** `anoInicio`/`anoFim` nunca eram aplicados na query
+   — o filtro global de intervalo de anos simplesmente não afetava o gráfico de série temporal.
+   Só ficou visível testando um recorte de anos que exclui os únicos anos com dado de
+   `censo_demografico` (2010/2022) e vendo que a série voltava com valor mesmo assim.
+2. **`/api/filtros` e `/api/indicadores` estouravam 1 segundo com a base completa** (2,2s e 1,17s
+   respectivamente), mesmo com os índices certos. A causa não era falta de índice — era número de
+   *round-trips* ao banco: `filtros` fazia 5 consultas separadas e `indicadores` fazia até 7
+   (algumas em paralelo, mas com uma sequencial no fim). Cada ida e volta até o Neon custa uns
+   150–200ms sozinha; 5–7 delas somam mais que 1s mesmo que cada consulta individual seja rápida.
+   Consolidei `filtros` numa única query (5 subselects resolvidos pelo Postgres, não pelo Node) e
+   `indicadores` em 3 (usando `FILTER` do Postgres pra combinar agregados que antes eram consultas
+   separadas). Resultado: `filtros` caiu pra ~0,3–0,5s e `indicadores` pra ~0,2–0,4s.
+
+Depois do fix, os 5 endpoints ficaram entre 0,15s e 0,53s contra as 144.894 linhas sintéticas, e os
+6 números da seção de conferência continuaram batendo exatamente (validados de novo depois da
+correção, com o arquivo real). O gerador do CSV sintético não ficou no repositório — foi só uma
+ferramenta de teste, não faz parte da aplicação.
+
 ## Dificuldades encontradas
 
 **TypeScript no backend.** Uso TypeScript no dia a dia principalmente no frontend; escrever
@@ -150,7 +226,18 @@ para `createMany` (`data: X | X[]`), e acompanhar a mudança de `moduleResolutio
 que descobri estar depreciado, para `"node10"` — também já depreciado na mesma versão do TS —
 até `"nodenext"`, que é o recomendado hoje) foram coisas novas pra mim nesse projeto. Levou mais
 tempo do que eu esperava só para deixar o `tsconfig.json` correto antes de escrever a primeira
-linha de código de feature.
+linha de código de feature. No frontend apareceu uma versão menor do mesmo tipo de problema: o
+TypeScript 6 (usado pelo scaffold mais recente do Vite) tem uma flag nova, `erasableSyntaxOnly`,
+que proíbe o atalho de *parameter properties* no construtor de classe (`constructor(public x: T)`)
+— tive que reescrever `ApiError` no estilo mais explícito (campo declarado, atribuído no corpo do
+construtor).
+
+**Prisma 7 exigindo driver adapter.** No meio da configuração inicial, atualizei o Prisma pra
+versão mais recente (7.9.1) só por rotina, e a migração quebrou: a versão nova não aceita mais
+`url = env("DATABASE_URL")` direto no `schema.prisma`, exige um *driver adapter*
+(`@prisma/adapter-pg`) e um arquivo `prisma.config.ts` novo. Como o ganho não compensava o custo de
+configuração extra pra um projeto deste tamanho, revertei pra v5.22 (ainda mantida) — decisão
+registrada em "Decisões de arquitetura" acima.
 
 **Troca de arquitetura no meio do caminho.** Comecei com `core/` fazendo o papel de lógica de
 negócio + acesso a dados junto (2 camadas: `api` + `core`). Ao perceber que isso divergia do
@@ -159,12 +246,24 @@ padrão de 3 camadas que uso e entendo bem em outro projeto (Go), refatorei `upl
 Como já registrado acima, essa troca foi mais por preferência de organização pessoal do que por
 necessidade técnica; vale o registro para ser honesto sobre o motivo real da mudança.
 
+**GRC-FRONT é Angular, não React.** Fui olhar meu outro projeto de frontend pra manter alguma
+consistência de organização, esperando algo direto de copiar — mas é Angular (módulos, serviços
+injetáveis, RxJS), que não tem equivalente 1:1 em React (sem injeção de dependência, sem
+`services/` no sentido Angular). Adaptei o princípio (pastas por feature) em vez do código: no
+frontend, `services/` virou `hooks/` (a forma idiomática de React de buscar dado, aqui com React
+Query), sem tentar forçar um padrão de um framework diferente no outro.
+
+**Os dois bugs achados só testando em escala** (filtro de ano não aplicado em `/api/series`, e
+`/api/filtros`/`/api/indicadores` estourando 1 segundo com a base completa) — detalhados na seção
+"Validação em escala" acima — foram a dificuldade mais séria do projeto: a amostra de 3.534 linhas
+não tinha volume nem variação suficiente pra expor nenhum dos dois. Só apareceram depois que gerei
+um CSV sintético do tamanho da base real e testei cada endpoint contra ele deliberadamente, em vez
+de confiar que "funcionou com a amostra" significava "está pronto".
+
 ## O que ficou de fora (por enquanto)
 
-- Frontend (React + Vite + Tailwind) — próxima etapa.
-- Mapa coroplético, escolas individuais e outros enriquecimentos com dados externos — avaliar se
-  sobra tempo depois do núcleo (frontend) estar pronto.
-- GitHub Actions e deploy público — ainda não feitos.
+- Mapa coroplético, escolas individuais e outros enriquecimentos com dados externos.
+- GitHub Actions e deploy público.
 
 ## Licença
 
