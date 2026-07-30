@@ -4,6 +4,7 @@ import { CardsIndicadores } from '../features/indicadores/components/CardsIndica
 import { GraficoSerie } from '../features/series/components/GraficoSerie';
 import { GraficoRanking } from '../features/ranking/components/GraficoRanking';
 import { GraficoQuebraRede } from '../features/quebraRede/components/GraficoQuebraRede';
+import { TabelaDados } from '../features/dados/components/TabelaDados';
 
 export function Dashboard() {
   return (
@@ -22,6 +23,7 @@ export function Dashboard() {
         <GraficoSerie />
         <GraficoRanking />
         <GraficoQuebraRede />
+        <TabelaDados />
       </div>
     </main>
   );
