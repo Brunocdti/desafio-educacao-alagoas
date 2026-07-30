@@ -1,6 +1,8 @@
 import { FiltrosBar } from '../features/filtros/components/FiltrosBar';
 import { UploadForm } from '../features/upload/components/UploadForm';
 import { CardsIndicadores } from '../features/indicadores/components/CardsIndicadores';
+import { GraficoSerie } from '../features/series/components/GraficoSerie';
+import { GraficoRanking } from '../features/ranking/components/GraficoRanking';
 
 export function Dashboard() {
   return (
@@ -16,6 +18,8 @@ export function Dashboard() {
         <UploadForm />
         <FiltrosBar />
         <CardsIndicadores />
+        <GraficoSerie />
+        <GraficoRanking />
       </div>
     </main>
   );
