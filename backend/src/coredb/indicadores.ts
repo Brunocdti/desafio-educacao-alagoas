@@ -1,59 +1,22 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { VARIAVEL_MATRICULA, redeEfetiva } from '../lib/dominio';
-import { filtroAno, filtroAnoIntervalo, filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
+import { filtroAnoIntervalo, filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
 import { FiltroBase } from '../lib/filtroQuery';
 import { Indicadores, IndicadoresStore } from '../core/indicadores';
 
-async function mediaPonderada(
-  variavel: string,
-  ano: number,
-  rede: string,
-  filtro: FiltroBase,
-): Promise<number | null> {
-  const clausulas = Prisma.join(
-    [filtroMunicipios(filtro.municipio), filtroRede(rede), filtroEtapa(filtro.etapa), filtroAno(ano)],
-    ' ',
-  );
-  const rows = await prisma.$queryRaw<{ valor: number | null }[]>(Prisma.sql`
-    SELECT (SUM(m.valor * COALESCE(mat.valor, 1)) / NULLIF(SUM(COALESCE(mat.valor, 1)), 0))::float8 AS valor
-    FROM medida m
-    LEFT JOIN medida mat
-      ON mat.co_mun = m.co_mun
-     AND mat.ano = m.ano
-     AND mat.ensino_rede = m.ensino_rede
-     AND mat.ensino_tipo = m.ensino_tipo
-     AND mat.fonte = 'censo_escolar'
-     AND mat.variavel = ${VARIAVEL_MATRICULA}
-    WHERE m.variavel = ${variavel}
-      ${clausulas}
-  `);
-  return rows[0]?.valor ?? null;
-}
-
-async function somaMatriculas(
-  ano: number,
-  rede: string,
-  filtro: FiltroBase,
-): Promise<number | null> {
-  const clausulas = Prisma.join(
-    [filtroMunicipios(filtro.municipio), filtroRede(rede), filtroEtapa(filtro.etapa), filtroAno(ano)],
-    ' ',
-  );
-  const rows = await prisma.$queryRaw<{ valor: number | null }[]>(Prisma.sql`
-    SELECT SUM(m.valor)::float8 AS valor
-    FROM medida m
-    WHERE m.variavel = ${VARIAVEL_MATRICULA}
-      ${clausulas}
-  `);
-  return rows[0]?.valor ?? null;
-}
-
+/**
+ * 3 idas ao banco (era até 7): uma pros anos de referência, uma pra
+ * matrículas+escolas dos dois anos juntos (FILTER em vez de query separada),
+ * uma pras duas taxas ponderadas juntas. Com a base completa (145 mil linhas),
+ * cada round-trip ao Neon custa ~150-200ms — 7 delas estourava o 1s exigido
+ * pelos endpoints de agregação; 3 fica com folga confortável.
+ */
 export const indicadoresStore: IndicadoresStore = {
   async obterIndicadores(filtro: FiltroBase): Promise<Indicadores> {
     const redeEducacional = redeEfetiva(VARIAVEL_MATRICULA, filtro.rede);
 
-    const clausulasAno = Prisma.join(
+    const clausulasFiltro = Prisma.join(
       [
         filtroMunicipios(filtro.municipio),
         filtroRede(redeEducacional),
@@ -61,11 +24,26 @@ export const indicadoresStore: IndicadoresStore = {
       ],
       ' ',
     );
-    const anoRows = await prisma.$queryRaw<{ ano: number | null }[]>(Prisma.sql`
-      SELECT MAX(m.ano) AS ano FROM medida m
-      WHERE m.variavel = ${VARIAVEL_MATRICULA} ${clausulasAno}
-    `);
-    const anoReferencia = anoRows[0]?.ano ?? null;
+
+    const [anos] = await prisma.$queryRaw<{ anoReferencia: number | null; anoAnterior: number | null }[]>(
+      Prisma.sql`
+        WITH ref AS (
+          SELECT MAX(m.ano) AS ano_referencia
+          FROM medida m
+          WHERE m.variavel = ${VARIAVEL_MATRICULA} ${clausulasFiltro}
+        )
+        SELECT
+          ref.ano_referencia AS "anoReferencia",
+          (
+            SELECT MAX(m.ano) FROM medida m
+            WHERE m.variavel = ${VARIAVEL_MATRICULA}
+              AND m.ano < ref.ano_referencia
+              ${clausulasFiltro}
+          ) AS "anoAnterior"
+        FROM ref
+      `,
+    );
+    const anoReferencia = anos?.anoReferencia ?? null;
 
     if (anoReferencia === null) {
       return {
@@ -78,54 +56,67 @@ export const indicadoresStore: IndicadoresStore = {
         observacao: 'Sem dado no período selecionado.',
       };
     }
+    const anoAnterior = anos.anoAnterior ?? null;
 
-    const [totalMatriculas, totalEscolasRows, taxaAprovacaoMedia, taxaAbandonoMedia, anoAnteriorRows] =
-      await Promise.all([
-        somaMatriculas(anoReferencia, redeEducacional, filtro),
-        prisma.$queryRaw<{ valor: number | null }[]>(Prisma.sql`
-          SELECT SUM(m.valor)::float8 AS valor
-          FROM medida m
-          WHERE m.variavel = 'Escolas'
-            ${Prisma.join(
-              [
-                filtroMunicipios(filtro.municipio),
-                filtroRede(redeEducacional),
-                filtroEtapa(filtro.etapa),
-                filtroAno(anoReferencia),
-              ],
-              ' ',
-            )}
-        `),
-        mediaPonderada('Taxa de Aprovação', anoReferencia, redeEducacional, filtro),
-        mediaPonderada('Taxa de Abandono', anoReferencia, redeEducacional, filtro),
-        prisma.$queryRaw<{ ano: number | null }[]>(Prisma.sql`
-          SELECT MAX(m.ano) AS ano FROM medida m
-          WHERE m.variavel = ${VARIAVEL_MATRICULA} AND m.ano < ${anoReferencia} ${clausulasAno}
-        `),
-      ]);
+    const clausulasSemAno = Prisma.join(
+      [filtroMunicipios(filtro.municipio), filtroRede(redeEducacional), filtroEtapa(filtro.etapa)],
+      ' ',
+    );
+    const anosParaBuscar = anoAnterior !== null ? [anoReferencia, anoAnterior] : [anoReferencia];
 
-    const anoAnterior = anoAnteriorRows[0]?.ano ?? null;
+    const [porAno, taxas] = await Promise.all([
+      prisma.$queryRaw<{ ano: number; matriculas: number | null; escolas: number | null }[]>(Prisma.sql`
+        SELECT
+          m.ano AS ano,
+          SUM(m.valor) FILTER (WHERE m.variavel = ${VARIAVEL_MATRICULA})::float8 AS matriculas,
+          SUM(m.valor) FILTER (WHERE m.variavel = 'Escolas')::float8 AS escolas
+        FROM medida m
+        WHERE m.ano IN (${Prisma.join(anosParaBuscar)})
+          ${clausulasSemAno}
+        GROUP BY m.ano
+      `),
+      prisma.$queryRaw<{ taxaAprovacao: number | null; taxaAbandono: number | null }[]>(Prisma.sql`
+        SELECT
+          (SUM(m.valor * COALESCE(mat.valor, 1)) FILTER (WHERE m.variavel = 'Taxa de Aprovação')
+            / NULLIF(SUM(COALESCE(mat.valor, 1)) FILTER (WHERE m.variavel = 'Taxa de Aprovação'), 0))::float8 AS "taxaAprovacao",
+          (SUM(m.valor * COALESCE(mat.valor, 1)) FILTER (WHERE m.variavel = 'Taxa de Abandono')
+            / NULLIF(SUM(COALESCE(mat.valor, 1)) FILTER (WHERE m.variavel = 'Taxa de Abandono'), 0))::float8 AS "taxaAbandono"
+        FROM medida m
+        LEFT JOIN medida mat
+          ON mat.co_mun = m.co_mun
+         AND mat.ano = m.ano
+         AND mat.ensino_rede = m.ensino_rede
+         AND mat.ensino_tipo = m.ensino_tipo
+         AND mat.fonte = 'censo_escolar'
+         AND mat.variavel = ${VARIAVEL_MATRICULA}
+        WHERE m.variavel IN ('Taxa de Aprovação', 'Taxa de Abandono') AND m.ano = ${anoReferencia}
+          ${clausulasSemAno}
+      `),
+    ]);
+
+    const taxa = taxas[0];
+    const linhaReferencia = porAno.find((l) => l.ano === anoReferencia);
+    const linhaAnterior = anoAnterior !== null ? porAno.find((l) => l.ano === anoAnterior) : undefined;
+    const totalMatriculas = linhaReferencia?.matriculas ?? null;
+
     let variacaoMatriculasAnoAAno: Indicadores['variacaoMatriculasAnoAAno'] = null;
-    if (anoAnterior !== null) {
-      const valorAnterior = await somaMatriculas(anoAnterior, redeEducacional, filtro);
-      if (valorAnterior !== null && valorAnterior !== 0 && totalMatriculas !== null) {
-        variacaoMatriculasAnoAAno = {
-          anoAnterior,
-          valorAnterior,
-          percentual: ((totalMatriculas - valorAnterior) / valorAnterior) * 100,
-        };
-      }
+    if (anoAnterior !== null && linhaAnterior?.matriculas != null && linhaAnterior.matriculas !== 0 && totalMatriculas !== null) {
+      variacaoMatriculasAnoAAno = {
+        anoAnterior,
+        valorAnterior: linhaAnterior.matriculas,
+        percentual: ((totalMatriculas - linhaAnterior.matriculas) / linhaAnterior.matriculas) * 100,
+      };
     }
 
     return {
       anoReferencia,
       totalMatriculas,
       totalEscolas: {
-        valor: totalEscolasRows[0]?.valor ?? null,
+        valor: linhaReferencia?.escolas ?? null,
         rotulo: filtro.etapa ? 'escolas' : 'ofertas de ensino',
       },
-      taxaAprovacaoMedia: { valor: taxaAprovacaoMedia, metodo: 'ponderada por matrícula' },
-      taxaAbandonoMedia: { valor: taxaAbandonoMedia, metodo: 'ponderada por matrícula' },
+      taxaAprovacaoMedia: { valor: taxa?.taxaAprovacao ?? null, metodo: 'ponderada por matrícula' },
+      taxaAbandonoMedia: { valor: taxa?.taxaAbandono ?? null, metodo: 'ponderada por matrícula' },
       variacaoMatriculasAnoAAno,
     };
   },

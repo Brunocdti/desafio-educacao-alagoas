@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { TODAS_VARIAVEIS, VARIAVEIS_PERCENTUAL, VARIAVEL_MATRICULA, redeEfetiva } from '../lib/dominio';
-import { filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
+import { filtroAnoIntervalo, filtroEtapa, filtroMunicipios, filtroRede } from '../lib/whereBuilder';
 import { PontoSerie, SeriesStore } from '../core/series';
 
 export const seriesStore: SeriesStore = {
@@ -13,7 +13,12 @@ export const seriesStore: SeriesStore = {
 
     const rede = redeEfetiva(variavel, filtro.rede);
     const clausulas = Prisma.join(
-      [filtroMunicipios(filtro.municipio), filtroRede(rede), filtroEtapa(filtro.etapa)],
+      [
+        filtroMunicipios(filtro.municipio),
+        filtroRede(rede),
+        filtroEtapa(filtro.etapa),
+        filtroAnoIntervalo(filtro.anoInicio, filtro.anoFim),
+      ],
       ' ',
     );
     const observacao =
