@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Card } from '../../../components/Card';
 import { useUpload } from '../hooks/useUpload';
 import { ApiError } from '../../../lib/apiClient';
 
@@ -12,24 +13,22 @@ export function UploadForm() {
   }
 
   return (
-    <div className="rounded border border-gray-200 bg-white p-4">
-      <h2 className="text-lg font-medium text-gray-900">Upload do CSV</h2>
-      <p className="mt-1 text-sm text-gray-600">
-        Reenviar um arquivo substitui todos os dados importados anteriormente.
-      </p>
-
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+    <Card
+      title="Upload do CSV"
+      subtitle="Reenviar um arquivo substitui todos os dados importados anteriormente."
+    >
+      <div className="flex flex-wrap items-center gap-3">
         <input
           type="file"
           accept=".csv"
           onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
-          className="text-sm text-gray-700 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-gray-200 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-800 hover:file:bg-gray-300"
+          className="text-sm text-slate-600 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-800 hover:file:bg-slate-200"
         />
         <button
           type="button"
           onClick={enviar}
           disabled={!arquivo || upload.isPending}
-          className="rounded bg-gray-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
         >
           {upload.isPending ? 'Processando…' : 'Enviar'}
         </button>
@@ -42,7 +41,7 @@ export function UploadForm() {
       )}
 
       {upload.isSuccess && (
-        <div className="mt-3 rounded bg-green-50 p-3 text-sm text-green-800">
+        <div className="mt-3 rounded bg-emerald-50 p-3 text-sm text-slate-900">
           <p>
             <strong>{upload.data.linhasLidas}</strong> linhas lidas,{' '}
             <strong>{upload.data.linhasImportadas}</strong> importadas,{' '}
@@ -60,6 +59,6 @@ export function UploadForm() {
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
