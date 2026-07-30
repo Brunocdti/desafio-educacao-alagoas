@@ -3,6 +3,7 @@ import { UploadForm } from '../features/upload/components/UploadForm';
 import { CardsIndicadores } from '../features/indicadores/components/CardsIndicadores';
 import { GraficoSerie } from '../features/series/components/GraficoSerie';
 import { GraficoRanking } from '../features/ranking/components/GraficoRanking';
+import { GraficoQuebraRede } from '../features/quebraRede/components/GraficoQuebraRede';
 
 export function Dashboard() {
   return (
@@ -20,6 +21,7 @@ export function Dashboard() {
         <CardsIndicadores />
         <GraficoSerie />
         <GraficoRanking />
+        <GraficoQuebraRede />
       </div>
     </main>
   );
