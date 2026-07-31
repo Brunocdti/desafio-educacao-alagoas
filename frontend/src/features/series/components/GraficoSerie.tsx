@@ -106,7 +106,7 @@ export function GraficoSerie() {
                 width={64}
                 tickFormatter={(v: number) => formatarValor(variavel, v)}
               />
-              <Tooltip content={<TooltipSerie variavel={variavel} />} />
+              <Tooltip content={<TooltipSerie variavel={variavel} />} isAnimationActive={false} />
               <Line
                 type="monotone"
                 dataKey="valor"

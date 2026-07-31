@@ -92,7 +92,11 @@ export function GraficoQuebraRede() {
                 width={64}
                 tickFormatter={(v: number) => formatarValor(variavel, v)}
               />
-              <Tooltip content={<TooltipRede variavel={variavel} />} cursor={{ fill: '#f1f5f9' }} />
+              <Tooltip
+                content={<TooltipRede variavel={variavel} />}
+                cursor={{ fill: '#f1f5f9' }}
+                isAnimationActive={false}
+              />
               <Bar dataKey="valor" fill={CHART.accent} radius={[4, 4, 0, 0]} maxBarSize={64}>
                 <LabelList
                   dataKey="valor"
