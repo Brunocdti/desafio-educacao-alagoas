@@ -22,9 +22,9 @@ Núcleo completo, ponta a ponta: upload com validação/streaming, os 5 endpoint
 (`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`), documentação
 OpenAPI/Swagger em `/docs`, e o dashboard no frontend (upload, filtros globais, 4 cards de
 indicadores, os 3 gráficos obrigatórios — série temporal, ranking entre municípios e quebra por
-rede de ensino — e a tabela paginada). Validado com um arquivo sintético de ~145 mil linhas (ver
-seção "Validação em escala" abaixo). CI configurado (GitHub Actions). Faltam só os diferenciais
-opcionais: deploy público e enriquecimento com dados externos (mapa, etc.).
+rede de ensino — e a tabela paginada), mais o mapa coroplético. Validado com um arquivo sintético
+de ~145 mil linhas (ver "Validação em escala" abaixo). CI configurado (GitHub Actions). Falta só o
+deploy público.
 
 ## Como rodar o backend do zero
 
@@ -268,9 +268,25 @@ pra CI — nunca o Neon real — e build) e um pro frontend (lint, `tsc -b` + bu
 backend precisam de banco porque `processarUpload` roda transação real; por isso o job sobe um
 container `postgres:16-alpine` descartável e aplica as migrations nele antes de rodar `npm test`.
 
+## Mapa coroplético
+
+Colore os 102 municípios de Alagoas pelo valor de uma variável/ano escolhidos. A malha (GeoJSON
+do IBGE, API de malhas territoriais) foi baixada uma vez e versionada em
+`frontend/public/malha-alagoas.geo.json` — nunca importada no bundle JS, nunca buscada ao vivo na
+API do IBGE em runtime, seguindo a regra de que a aplicação tem que continuar funcionando só com o
+CSV mesmo se uma API externa cair. O join com os dados é pelo código IBGE de 7 dígitos
+(`properties.codarea` no GeoJSON, `co_mun` no banco) — nunca por nome de município.
+
+Decisões: escala sequencial de matiz única (azul, claro→escuro, nunca arco-íris), quebras por
+**quantil** (não lineares — cada faixa tem aproximadamente o mesmo número de municípios, o que
+evita que Maceió, bem maior que o resto, esmague a escala numa única cor), legenda com os valores
+de cada faixa, e município sem dado em cinza (nunca na cor do valor mais baixo, que mentiria dizendo
+que o valor é zero). Com a amostra (10 dos 102 municípios), a maior parte do mapa aparece cinza —
+esperado; com a base completa, os 102 aparecem coloridos.
+
 ## O que ficou de fora (por enquanto)
 
-- Mapa coroplético e escolas individuais (dados externos do INEP/IBGE).
+- Escolas individuais (dados externos do INEP, sem chave de cruzamento no CSV agregado).
 - Deploy público.
 
 ## Licença
