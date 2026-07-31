@@ -268,6 +268,29 @@ pra CI — nunca o Neon real — e build) e um pro frontend (lint, `tsc -b` + bu
 backend precisam de banco porque `processarUpload` roda transação real; por isso o job sobe um
 container `postgres:16-alpine` descartável e aplica as migrations nele antes de rodar `npm test`.
 
+## Deploy
+
+O `render.yaml` na raiz do repo é um *Blueprint* do [Render](https://render.com) que sobe backend
+(Web Service Node) e frontend (Static Site) juntos. Passo a passo:
+
+1. Criar conta no Render (grátis, sem cartão de crédito) e conectar ela ao GitHub.
+2. No painel, **New +** → **Blueprint**, escolher este repositório. O Render lê o `render.yaml` e
+   propõe os dois serviços automaticamente.
+3. Antes de confirmar, preencher as variáveis marcadas como manuais:
+   - No serviço de backend: `DATABASE_URL` (a mesma connection string do Neon usada localmente).
+     `CORS_ORIGIN` fica em branco por enquanto — o Render só sabe a URL do frontend depois de criá-lo.
+   - No serviço de frontend: `VITE_API_URL` também fica em branco por enquanto, pelo mesmo motivo
+     (o Vite grava essa URL no build estático, então precisa saber a URL do backend antes de buildar).
+4. Depois que os dois serviços tiverem uma URL pública (`https://educacao-alagoas-backend.onrender.com`
+   e `https://educacao-alagoas-frontend.onrender.com`, por exemplo), voltar nas configurações de
+   cada um e preencher a variável que faltou (`CORS_ORIGIN` no backend com a URL do frontend;
+   `VITE_API_URL` no frontend com a URL do backend) — isso dispara um redeploy automático de cada um.
+5. Testar subindo o CSV pela tela de upload do frontend publicado.
+
+**Atenção:** o plano gratuito do Render "dorme" o backend depois de um tempo sem uso — o primeiro
+acesso depois disso demora uns 30–60 segundos pra responder (o servidor está acordando), o que é
+esperado, não é bug.
+
 ## Mapa coroplético
 
 Colore os 102 municípios de Alagoas pelo valor de uma variável/ano escolhidos. A malha (GeoJSON
@@ -287,7 +310,8 @@ esperado; com a base completa, os 102 aparecem coloridos.
 ## O que ficou de fora (por enquanto)
 
 - Escolas individuais (dados externos do INEP, sem chave de cruzamento no CSV agregado).
-- Deploy público.
+- Deploy público ainda não publicado — a configuração (`render.yaml`) já está pronta, só falta o
+  passo manual de criar a conta no Render e clicar em "Deploy" (seção Deploy acima).
 
 ## Licença
 
