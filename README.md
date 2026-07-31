@@ -18,13 +18,14 @@ upload manualmente sem precisar do arquivo completo (145 mil linhas) em mãos.
 
 ## Status
 
-Núcleo completo, ponta a ponta: upload com validação/streaming, os 5 endpoints de agregação
+Núcleo completo, ponta a ponta: upload com validação/streaming, os 5 endpoints de leitura
 (`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`), documentação
 OpenAPI/Swagger em `/docs`, e o dashboard no frontend (upload, filtros globais, 4 cards de
 indicadores, os 3 gráficos obrigatórios — série temporal, ranking entre municípios e quebra por
 rede de ensino — e a tabela paginada), mais o mapa coroplético. Validado com um arquivo sintético
-de ~145 mil linhas (ver "Validação em escala" abaixo). CI configurado (GitHub Actions). Falta só o
-deploy público.
+de ~145 mil linhas (ver "Validação em escala" abaixo). CI configurado (GitHub Actions). Deploy
+público no ar: [educacao-alagoas-frontend.onrender.com](https://educacao-alagoas-frontend.onrender.com)
+(backend em [educacao-alagoas-backend.onrender.com](https://educacao-alagoas-backend.onrender.com)).
 
 ## Como rodar o backend do zero
 
@@ -133,7 +134,7 @@ ports & adapters: `core/{recurso}.ts` só tem tipos e uma interface (o contrato 
 Prisma/SQL de verdade (e é onde os testes ficam, ao lado do código que testam); `api/{recurso}.ts`
 expõe só o handler HTTP, chamando a implementação através do tipo do `core`. Essa separação
 **não nasceu de uma necessidade técnica deste projeto** — um projeto deste tamanho (uma tabela,
-6 endpoints de leitura, sem troca de banco nem mock em teste) se sustentaria bem com só 2 camadas.
+5 endpoints de leitura, sem troca de banco nem mock em teste) se sustentaria bem com só 2 camadas.
 A decisão foi tomada por **familiaridade pessoal**: é o padrão que uso em um projeto Go maior
 (camadas `core`/`coredb`/`apiserver`), e optar por replicá-lo aqui foi mais uma questão de
 organização e conforto de navegação no código do que de complexidade real — inclusive comecei o projeto com
@@ -156,7 +157,7 @@ explícito (`@prisma/adapter-pg`) e um `prisma.config.ts` novo — setup bem mai
 `schema.prisma` simples com `url = env("DATABASE_URL")`. Como o ganho não compensava o custo de
 configuração extra para este projeto, fiquei na v5.22, que segue mantida e amplamente usada.
 
-**Agregação em SQL parametrizado, não em JavaScript.** Os 4 endpoints de agregação
+**Agregação em SQL parametrizado, não em JavaScript.** Dos 5 endpoints de leitura, 4
 (`series`, `ranking`, `indicadores`, `dados`) fazem a soma/média/paginação no banco
 (`prisma.$queryRaw` com *tagged templates*, que parametrizam automaticamente — nunca
 concatenação de string), com um índice composto em `(ano, variavel, ensino_rede, ensino_tipo)`.
@@ -232,6 +233,17 @@ que proíbe o atalho de *parameter properties* no construtor de classe (`constru
 — tive que reescrever `ApiError` no estilo mais explícito (campo declarado, atribuído no corpo do
 construtor).
 
+**Ambiente novo: Prisma e Vite.** Nunca tinha configurado um projeto do zero com Prisma nem com
+Vite antes deste desafio. Entender o fluxo do Prisma — schema declarativo, `prisma migrate dev`
+gerando SQL versionado, `prisma generate` recriando o client tipado a cada mudança de schema, e a
+diferença entre uma migração de verdade e um `db push` — tomou um tempo de leitura de documentação
+antes de eu me sentir confiante rodando contra o Neon. Do lado do Vite, o maior estranhamento foi
+descobrir que as variáveis `VITE_*` são resolvidas em tempo de build, não de execução; isso só
+ficou claro de verdade na hora do deploy, quando percebi que trocar `VITE_API_URL` no Render exige
+rebuildar o site estático, não só reiniciar o serviço (documentado em "Deploy" abaixo). O projeto
+TypeScript do frontend também usa `tsc -b` (project references) em vez do `tsc` direto que eu já
+conhecia — mais uma peça de configuração nova antes de escrever a primeira linha de feature.
+
 **Prisma 7 exigindo driver adapter.** No meio da configuração inicial, atualizei o Prisma pra
 versão mais recente (7.9.1) só por rotina, e a migração quebrou: a versão nova não aceita mais
 `url = env("DATABASE_URL")` direto no `schema.prisma`, exige um *driver adapter*
@@ -246,12 +258,17 @@ padrão de 3 camadas que uso e entendo bem em outro projeto (Go), refatorei `upl
 Como já registrado acima, essa troca foi mais por preferência de organização pessoal do que por
 necessidade técnica; vale o registro para ser honesto sobre o motivo real da mudança.
 
-**GRC-FRONT é Angular, não React.** Fui olhar meu outro projeto de frontend pra manter alguma
-consistência de organização, esperando algo direto de copiar — mas é Angular (módulos, serviços
-injetáveis, RxJS), que não tem equivalente 1:1 em React (sem injeção de dependência, sem
-`services/` no sentido Angular). Adaptei o princípio (pastas por feature) em vez do código: no
-frontend, `services/` virou `hooks/` (a forma idiomática de React de buscar dado, aqui com React
-Query), sem tentar forçar um padrão de um framework diferente no outro.
+**Mais costume com Angular do que com React puro.** No dia a dia escrevo mais Angular (módulos,
+serviços injetáveis, RxJS, template HTML separado do componente) do que React puro, e a mudança de
+mentalidade pra hooks — estado e efeito colateral vivendo dentro do próprio componente, sem
+injeção de dependência, sem observable — causou uma estranheza inicial. A parte que mais me travou
+foi decidir o que vira estado local (`useState`), o que vira estado de servidor (React Query) e o
+que vira estado global (Zustand), já que em Angular esse tipo de decisão tende a já vir resolvida
+pela arquitetura de serviços. Fui olhar meu outro projeto de frontend (GRC-FRONT) esperando achar
+algo direto de copiar pra estrutura, mas é Angular — não tem equivalente 1:1 em React (sem
+injeção de dependência, sem `services/` no sentido Angular). Adaptei o princípio (pastas por
+feature) em vez do código: `services/` virou `hooks/`, a forma idiomática de React de buscar dado,
+aqui com React Query.
 
 **Os dois bugs achados só testando em escala** (filtro de ano não aplicado em `/api/series`, e
 `/api/filtros`/`/api/indicadores` estourando 1 segundo com a base completa) — detalhados na seção
@@ -273,7 +290,7 @@ prendendo o tooltip no dado antigo, enquanto a cor seguia se atualizando normalm
 caminho. Corrigi tratando `isPlaceholderData` como estado de carregamento só no mapa: agora ele
 espera o dado real da combinação nova antes de remontar. Também foi útil pra confirmar de novo um
 ponto já registrado em "Decisões sobre tratamento dos dados": a cobertura de ano varia por fonte, e
-ao testar troquei variável pra uma sem dado no ano selecionado antes de perceber que aquele caso
+ao testar troquei de variável pra uma sem dado no ano selecionado antes de perceber que aquele caso
 era esperado, não bug.
 
 ## CI
@@ -285,6 +302,10 @@ backend precisam de banco porque `processarUpload` roda transação real; por is
 container `postgres:16-alpine` descartável e aplica as migrations nele antes de rodar `npm test`.
 
 ## Deploy
+
+Publicado no Render:
+[educacao-alagoas-frontend.onrender.com](https://educacao-alagoas-frontend.onrender.com)
+(backend em [educacao-alagoas-backend.onrender.com](https://educacao-alagoas-backend.onrender.com)).
 
 O `render.yaml` na raiz do repo é um *Blueprint* do [Render](https://render.com) que sobe backend
 (Web Service Node) e frontend (Static Site) juntos. Passo a passo:
@@ -326,8 +347,6 @@ esperado; com a base completa, os 102 aparecem coloridos.
 ## O que ficou de fora (por enquanto)
 
 - Escolas individuais (dados externos do INEP, sem chave de cruzamento no CSV agregado).
-- Deploy público ainda não publicado — a configuração (`render.yaml`) já está pronta, só falta o
-  passo manual de criar a conta no Render e clicar em "Deploy" (seção Deploy acima).
 
 ## Licença
 
