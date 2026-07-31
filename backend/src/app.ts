@@ -10,6 +10,7 @@ import { seriesHandler } from './api/series';
 import { rankingHandler } from './api/ranking';
 import { indicadoresHandler } from './api/indicadores';
 import { dadosHandler } from './api/dados';
+import { evolucaoHandler } from './api/evolucao';
 
 export const app = express();
 
@@ -32,5 +33,6 @@ app.get('/api/series', seriesHandler);
 app.get('/api/ranking', rankingHandler);
 app.get('/api/indicadores', indicadoresHandler);
 app.get('/api/dados', dadosHandler);
+app.get('/api/evolucao', evolucaoHandler);
 
 app.use(errorHandler);

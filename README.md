@@ -18,13 +18,14 @@ upload manualmente sem precisar do arquivo completo (145 mil linhas) em mãos.
 
 ## Status
 
-Núcleo completo, ponta a ponta: upload com validação/streaming, os 5 endpoints de leitura
-(`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`), documentação
-OpenAPI/Swagger em `/docs`, e o dashboard no frontend (upload, filtros globais, 4 cards de
-indicadores, os 3 gráficos obrigatórios — série temporal, ranking entre municípios e quebra por
-rede de ensino — e a tabela paginada), mais o mapa coroplético. Validado com um arquivo sintético
-de ~145 mil linhas (ver "Validação em escala" abaixo). CI configurado (GitHub Actions). Deploy
-público no ar: [educacao-alagoas-frontend.onrender.com](https://educacao-alagoas-frontend.onrender.com)
+Núcleo completo, ponta a ponta: upload com validação/streaming, os 6 endpoints de leitura
+(`/api/filtros`, `/api/series`, `/api/ranking`, `/api/indicadores`, `/api/dados`, `/api/evolucao`),
+documentação OpenAPI/Swagger em `/docs`, e o dashboard no frontend (upload, filtros globais, 6
+cards de indicadores, os 3 gráficos obrigatórios — série temporal, ranking entre municípios e
+quebra por rede de ensino — mais a tabela paginada), o mapa coroplético e um ranking de evolução
+entre dois anos. Validado com um arquivo sintético de ~145 mil linhas (ver "Validação em escala"
+abaixo). CI configurado (GitHub Actions). Deploy público no ar:
+[educacao-alagoas-frontend.onrender.com](https://educacao-alagoas-frontend.onrender.com)
 (backend em [educacao-alagoas-backend.onrender.com](https://educacao-alagoas-backend.onrender.com)).
 
 ## Como rodar o backend do zero
@@ -134,7 +135,7 @@ ports & adapters: `core/{recurso}.ts` só tem tipos e uma interface (o contrato 
 Prisma/SQL de verdade (e é onde os testes ficam, ao lado do código que testam); `api/{recurso}.ts`
 expõe só o handler HTTP, chamando a implementação através do tipo do `core`. Essa separação
 **não nasceu de uma necessidade técnica deste projeto** — um projeto deste tamanho (uma tabela,
-5 endpoints de leitura, sem troca de banco nem mock em teste) se sustentaria bem com só 2 camadas.
+6 endpoints de leitura, sem troca de banco nem mock em teste) se sustentaria bem com só 2 camadas.
 A decisão foi tomada por **familiaridade pessoal**: é o padrão que uso em um projeto Go maior
 (camadas `core`/`coredb`/`apiserver`), e optar por replicá-lo aqui foi mais uma questão de
 organização e conforto de navegação no código do que de complexidade real — inclusive comecei o projeto com
@@ -157,12 +158,14 @@ explícito (`@prisma/adapter-pg`) e um `prisma.config.ts` novo — setup bem mai
 `schema.prisma` simples com `url = env("DATABASE_URL")`. Como o ganho não compensava o custo de
 configuração extra para este projeto, fiquei na v5.22, que segue mantida e amplamente usada.
 
-**Agregação em SQL parametrizado, não em JavaScript.** Dos 5 endpoints de leitura, 4
-(`series`, `ranking`, `indicadores`, `dados`) fazem a soma/média/paginação no banco
+**Agregação em SQL parametrizado, não em JavaScript.** Dos 6 endpoints de leitura, 5
+(`series`, `ranking`, `indicadores`, `dados`, `evolucao`) fazem a soma/média/paginação no banco
 (`prisma.$queryRaw` com *tagged templates*, que parametrizam automaticamente — nunca
 concatenação de string), com um índice composto em `(ano, variavel, ensino_rede, ensino_tipo)`.
 Trazer a base completa (145 mil linhas) inteira para o Node agregar em array não escalaria nem
-manteria as respostas rápidas.
+manteria as respostas rápidas. A única conta feita em JavaScript é o `sort`/`slice` final do
+`evolucao` — o Postgres já entrega só as linhas por município (no máximo 102), então ordenar isso
+em memória não tem o mesmo problema de escala que agregar 145 mil linhas teria.
 
 ## Decisões de interface
 
@@ -343,6 +346,31 @@ evita que Maceió, bem maior que o resto, esmague a escala numa única cor), leg
 de cada faixa, e município sem dado em cinza (nunca na cor do valor mais baixo, que mentiria dizendo
 que o valor é zero). Com a amostra (10 dos 102 municípios), a maior parte do mapa aparece cinza —
 esperado; com a base completa, os 102 aparecem coloridos.
+
+## Indicadores derivados, sem fonte externa
+
+Três indicadores que saem só do CSV que já tenho, sem cruzar com nada de fora:
+
+- **Alunos por escola** (matrículas ÷ escolas). Só calculo com uma etapa fixada no filtro — sem
+  isso, `Escolas` conta ofertas (mesmo problema do card de escolas), e a divisão daria "alunos por
+  oferta", não por escola de verdade. Sem etapa fixada, o card mostra "—" com essa explicação.
+- **Participação da rede privada** (matrícula Privada ÷ Total). Esse indicador ignora
+  deliberadamente o filtro de rede do recorte — ele *é* sobre a quebra de rede, então sempre
+  compara Privada contra Total, do mesmo jeito que o gráfico de "quebra por rede de ensino" já
+  ignora esse filtro.
+- **Ranking de evolução** (`/api/evolucao`): ordena os municípios pela maior melhora (ou piora) de
+  uma variável entre dois anos escolhidos. Pra variável que já é percentual (ex. Taxa de
+  Analfabetismo), comparo em pontos de diferença. Pra variável absoluta (ex. Matrícula), comparo em
+  variação percentual — senão o município maior sempre apareceria no topo só por ter números
+  maiores, o mesmo problema de porte desigual da média simples entre municípios. A direção
+  favorável (aumento é bom ou queda é boa) depende da variável — por exemplo, queda é boa em Taxa
+  de Abandono e Analfabetismo, aumento é bom nas demais — e decide a cor da barra (verde/vermelho)
+  no gráfico.
+
+Segue o mesmo padrão dos outros endpoints de agregação (SQL parametrizado, índice já existente em
+`(ano, variavel, ensino_rede, ensino_tipo)`); não repeti o teste de escala com 145 mil linhas
+especificamente para esse endpoint, mas a query é estruturalmente igual à de `ranking` (mesmo join
+de ponderação), que já passou nesse teste.
 
 ## O que ficou de fora (por enquanto)
 

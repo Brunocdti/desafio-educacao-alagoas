@@ -155,6 +155,33 @@ export const openapiSpec = {
         },
       },
     },
+    '/evolucao': {
+      get: {
+        summary: 'Ranking de municípios por variação de uma variável entre dois anos',
+        parameters: [
+          {
+            name: 'variavel',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', enum: [...TODAS_VARIAVEIS] },
+          },
+          { name: 'anoInicio', in: 'query', required: true, schema: { type: 'integer' } },
+          { name: 'anoFim', in: 'query', required: true, schema: { type: 'integer' } },
+          { name: 'limite', in: 'query', schema: { type: 'integer', default: 15 } },
+          ...filtroComum.filter((p) => p.name !== 'anoInicio' && p.name !== 'anoFim'),
+        ],
+        responses: {
+          '200': {
+            description: 'Municípios ordenados pela maior diferença (fim - início); só inclui quem tem dado nos dois anos',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/ItemEvolucao' } },
+              },
+            },
+          },
+        },
+      },
+    },
     '/dados': {
       get: {
         summary: 'Tabela paginada com os dados brutos do recorte atual',
@@ -259,7 +286,20 @@ export const openapiSpec = {
               percentual: { type: 'number' },
             },
           },
+          mediaAlunosPorEscola: { type: 'number', nullable: true },
+          participacaoRedePrivada: { type: 'number', nullable: true },
           observacao: { type: 'string' },
+        },
+      },
+      ItemEvolucao: {
+        type: 'object',
+        properties: {
+          coMun: { type: 'string' },
+          noMun: { type: 'string' },
+          valorInicio: { type: 'number' },
+          valorFim: { type: 'number' },
+          diferenca: { type: 'number' },
+          percentual: { type: 'number', nullable: true },
         },
       },
       ItemDado: {

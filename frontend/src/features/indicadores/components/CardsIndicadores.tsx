@@ -61,6 +61,20 @@ export function CardsIndicadores() {
           value={formatarPercentual(data.taxaAbandonoMedia.valor)}
           observacao={data.taxaAbandonoMedia.metodo}
         />
+        <StatTile
+          label="Alunos por escola"
+          value={data.mediaAlunosPorEscola !== null ? formatarNumero(Math.round(data.mediaAlunosPorEscola)) : '—'}
+          observacao={
+            data.mediaAlunosPorEscola === null
+              ? 'Fixe uma etapa no filtro para calcular — sem isso, "Escolas" conta ofertas, não escolas de verdade.'
+              : 'Matrículas ÷ escolas, na etapa fixada.'
+          }
+        />
+        <StatTile
+          label="Participação da rede privada"
+          value={data.participacaoRedePrivada !== null ? formatarPercentual(data.participacaoRedePrivada) : '—'}
+          observacao="Matrícula Privada ÷ Total, ignora o filtro de rede do recorte."
+        />
       </div>
     </div>
   );

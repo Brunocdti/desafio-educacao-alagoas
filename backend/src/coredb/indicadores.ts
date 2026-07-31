@@ -53,6 +53,8 @@ export const indicadoresStore: IndicadoresStore = {
         taxaAprovacaoMedia: { valor: null, metodo: 'ponderada por matrícula' },
         taxaAbandonoMedia: { valor: null, metodo: 'ponderada por matrícula' },
         variacaoMatriculasAnoAAno: null,
+        mediaAlunosPorEscola: null,
+        participacaoRedePrivada: null,
         observacao: 'Sem dado no período selecionado.',
       };
     }
@@ -64,7 +66,12 @@ export const indicadoresStore: IndicadoresStore = {
     );
     const anosParaBuscar = anoAnterior !== null ? [anoReferencia, anoAnterior] : [anoReferencia];
 
-    const [porAno, taxas] = await Promise.all([
+    const clausulasRedePrivada = Prisma.join(
+      [filtroMunicipios(filtro.municipio), filtroEtapa(filtro.etapa)],
+      ' ',
+    );
+
+    const [porAno, taxas, redePrivada] = await Promise.all([
       prisma.$queryRaw<{ ano: number; matriculas: number | null; escolas: number | null }[]>(Prisma.sql`
         SELECT
           m.ano AS ano,
@@ -92,9 +99,22 @@ export const indicadoresStore: IndicadoresStore = {
         WHERE m.variavel IN ('Taxa de Aprovação', 'Taxa de Abandono') AND m.ano = ${anoReferencia}
           ${clausulasSemAno}
       `),
+      prisma.$queryRaw<{ privada: number | null; total: number | null }[]>(Prisma.sql`
+        SELECT
+          SUM(m.valor) FILTER (WHERE m.ensino_rede = 'Privada')::float8 AS privada,
+          SUM(m.valor) FILTER (WHERE m.ensino_rede = 'Total')::float8 AS total
+        FROM medida m
+        WHERE m.variavel = ${VARIAVEL_MATRICULA} AND m.ano = ${anoReferencia}
+          ${clausulasRedePrivada}
+      `),
     ]);
 
     const taxa = taxas[0];
+    const redePrivadaLinha = redePrivada[0];
+    const participacaoRedePrivada =
+      redePrivadaLinha?.total != null && redePrivadaLinha.total !== 0 && redePrivadaLinha?.privada != null
+        ? (redePrivadaLinha.privada / redePrivadaLinha.total) * 100
+        : null;
     const linhaReferencia = porAno.find((l) => l.ano === anoReferencia);
     const linhaAnterior = anoAnterior !== null ? porAno.find((l) => l.ano === anoAnterior) : undefined;
     const totalMatriculas = linhaReferencia?.matriculas ?? null;
@@ -108,6 +128,13 @@ export const indicadoresStore: IndicadoresStore = {
       };
     }
 
+    // Só faz sentido com etapa fixada: sem isso, `escolas` conta ofertas (uma escola com
+    // duas etapas aparece duas vezes), e a divisão daria "matrículas por oferta", não por escola.
+    const mediaAlunosPorEscola =
+      filtro.etapa && linhaReferencia?.escolas != null && linhaReferencia.escolas !== 0 && totalMatriculas !== null
+        ? totalMatriculas / linhaReferencia.escolas
+        : null;
+
     return {
       anoReferencia,
       totalMatriculas,
@@ -118,6 +145,8 @@ export const indicadoresStore: IndicadoresStore = {
       taxaAprovacaoMedia: { valor: taxa?.taxaAprovacao ?? null, metodo: 'ponderada por matrícula' },
       taxaAbandonoMedia: { valor: taxa?.taxaAbandono ?? null, metodo: 'ponderada por matrícula' },
       variacaoMatriculasAnoAAno,
+      mediaAlunosPorEscola,
+      participacaoRedePrivada,
     };
   },
 };

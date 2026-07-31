@@ -6,6 +6,7 @@ import { GraficoRanking } from '../features/ranking/components/GraficoRanking';
 import { GraficoQuebraRede } from '../features/quebraRede/components/GraficoQuebraRede';
 import { TabelaDados } from '../features/dados/components/TabelaDados';
 import { MapaCoropletico } from '../features/mapa/components/MapaCoropletico';
+import { GraficoEvolucao } from '../features/evolucao/components/GraficoEvolucao';
 
 export function Dashboard() {
   return (
@@ -25,6 +26,7 @@ export function Dashboard() {
         <GraficoRanking />
         <GraficoQuebraRede />
         <MapaCoropletico />
+        <GraficoEvolucao />
         <TabelaDados />
       </div>
     </main>

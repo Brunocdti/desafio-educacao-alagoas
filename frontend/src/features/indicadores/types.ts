@@ -9,5 +9,7 @@ export interface Indicadores {
     valorAnterior: number;
     percentual: number;
   } | null;
+  mediaAlunosPorEscola: number | null;
+  participacaoRedePrivada: number | null;
   observacao?: string;
 }
