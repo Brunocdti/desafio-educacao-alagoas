@@ -26,11 +26,12 @@ export function MapaCoropletico() {
   const anoEfetivo = ano ?? filtros?.anos[filtros.anos.length - 1];
 
   // limite alto o bastante pra cobrir todos os 102 municípios de Alagoas.
-  const { data: valores, isLoading: carregandoValores, isError: erroValores } = useRanking(
-    variavel,
-    anoEfetivo,
-    150,
-  );
+  const {
+    data: valores,
+    isLoading: carregandoValores,
+    isPlaceholderData: valoresDesatualizados,
+    isError: erroValores,
+  } = useRanking(variavel, anoEfetivo, 150);
 
   const { porMunicipio, faixas } = useMemo(() => {
     const mapa = new Map<string, { noMun: string; valor: number }>();
@@ -65,7 +66,7 @@ export function MapaCoropletico() {
     });
   };
 
-  const carregando = carregandoMalha || carregandoValores;
+  const carregando = carregandoMalha || carregandoValores || valoresDesatualizados;
   const erro = erroMalha || erroValores;
 
   return (

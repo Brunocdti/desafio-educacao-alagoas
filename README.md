@@ -260,6 +260,22 @@ não tinha volume nem variação suficiente pra expor nenhum dos dois. Só apare
 um CSV sintético do tamanho da base real e testei cada endpoint contra ele deliberadamente, em vez
 de confiar que "funcionou com a amostra" significava "está pronto".
 
+**Tooltip do mapa desatualizado ao trocar filtro.** Só percebi depois de publicar no Render e
+testar de novo com calma: ao trocar variável ou ano no mapa, a cor do município atualizava certo,
+mas o nome/valor no tooltip às vezes ficava preso na combinação anterior. A causa foi a combinação
+de dois comportamentos que isoladamente fazem sentido, mas juntos escondem o problema: o
+`useRanking` usa `placeholderData` pra manter o dado anterior visível enquanto busca o novo (evita
+piscar loading a cada clique de filtro, uso isso em todo o dashboard), o que faz `isLoading` ficar
+`false` durante a troca; e o React-Leaflet só executa `onEachFeature` (onde ligo o tooltip) na
+criação da camada, não em toda atualização — diferente do `style`, que ele reaplica sozinho a cada
+render. Resultado: o `<GeoJSON>` remontava com a variável/ano novos antes do dado real chegar,
+prendendo o tooltip no dado antigo, enquanto a cor seguia se atualizando normalmente por outro
+caminho. Corrigi tratando `isPlaceholderData` como estado de carregamento só no mapa: agora ele
+espera o dado real da combinação nova antes de remontar. Também foi útil pra confirmar de novo um
+ponto já registrado em "Decisões sobre tratamento dos dados": a cobertura de ano varia por fonte, e
+ao testar troquei variável pra uma sem dado no ano selecionado antes de perceber que aquele caso
+era esperado, não bug.
+
 ## CI
 
 GitHub Actions (`.github/workflows/ci.yml`) roda em todo push/PR pra `main`: dois jobs
