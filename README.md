@@ -23,8 +23,8 @@ Núcleo completo, ponta a ponta: upload com validação/streaming, os 5 endpoint
 OpenAPI/Swagger em `/docs`, e o dashboard no frontend (upload, filtros globais, 4 cards de
 indicadores, os 3 gráficos obrigatórios — série temporal, ranking entre municípios e quebra por
 rede de ensino — e a tabela paginada). Validado com um arquivo sintético de ~145 mil linhas (ver
-seção "Validação em escala" abaixo). Faltam só os diferenciais opcionais: CI, deploy público e
-enriquecimento com dados externos (mapa, etc.).
+seção "Validação em escala" abaixo). CI configurado (GitHub Actions). Faltam só os diferenciais
+opcionais: deploy público e enriquecimento com dados externos (mapa, etc.).
 
 ## Como rodar o backend do zero
 
@@ -260,10 +260,18 @@ não tinha volume nem variação suficiente pra expor nenhum dos dois. Só apare
 um CSV sintético do tamanho da base real e testei cada endpoint contra ele deliberadamente, em vez
 de confiar que "funcionou com a amostra" significava "está pronto".
 
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) roda em todo push/PR pra `main`: dois jobs
+independentes, um pro backend (lint, `tsc --noEmit`, testes contra um Postgres efêmero subido só
+pra CI — nunca o Neon real — e build) e um pro frontend (lint, `tsc -b` + build). Os testes do
+backend precisam de banco porque `processarUpload` roda transação real; por isso o job sobe um
+container `postgres:16-alpine` descartável e aplica as migrations nele antes de rodar `npm test`.
+
 ## O que ficou de fora (por enquanto)
 
-- Mapa coroplético, escolas individuais e outros enriquecimentos com dados externos.
-- GitHub Actions e deploy público.
+- Mapa coroplético e escolas individuais (dados externos do INEP/IBGE).
+- Deploy público.
 
 ## Licença
 
