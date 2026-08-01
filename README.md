@@ -224,9 +224,9 @@ ele. Isso revelou dois problemas reais que não apareciam com a amostra pequena:
    separadas). Resultado: `filtros` caiu pra ~0,3–0,5s e `indicadores` pra ~0,2–0,4s.
 
 Depois do fix, os 5 endpoints ficaram entre 0,15s e 0,53s contra as 144.894 linhas sintéticas, e os
-6 números da seção de conferência continuaram batendo exatamente (validados de novo depois da
-correção, com o arquivo real). O gerador do CSV sintético não ficou no repositório — foi só uma
-ferramenta de teste, não faz parte da aplicação.
+6 números que já tinha validado no início do projeto continuaram batendo exatamente (conferidos de
+novo depois da correção, com o arquivo real). O gerador do CSV sintético não ficou no repositório —
+foi só uma ferramenta de teste, não faz parte da aplicação.
 
 ## Dificuldades encontradas
 
@@ -369,9 +369,9 @@ Três indicadores que saem só do CSV que já tenho, sem cruzar com nada de fora
   Analfabetismo), comparo em pontos de diferença. Pra variável absoluta (ex. Matrícula), comparo em
   variação percentual — senão o município maior sempre apareceria no topo só por ter números
   maiores, o mesmo problema de porte desigual da média simples entre municípios. A direção
-  favorável (aumento é bom ou queda é boa) depende da variável — por exemplo, queda é boa em Taxa
-  de Abandono e Analfabetismo, aumento é bom nas demais — e decide a cor da barra (verde/vermelho)
-  no gráfico.
+  favorável (aumento é bom ou queda é boa) depende da variável — queda é boa em Taxa de
+  Reprovação, Abandono e Analfabetismo, aumento é bom nas demais — e decide a cor da barra
+  (verde/vermelho) no gráfico.
 
 Segue o mesmo padrão dos outros endpoints de agregação (SQL parametrizado, índice já existente em
 `(ano, variavel, ensino_rede, ensino_tipo)`); não repeti o teste de escala com 145 mil linhas
