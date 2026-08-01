@@ -167,6 +167,12 @@ manteria as respostas rápidas. A única conta feita em JavaScript é o `sort`/`
 `evolucao` — o Postgres já entrega só as linhas por município (no máximo 102), então ordenar isso
 em memória não tem o mesmo problema de escala que agregar 145 mil linhas teria.
 
+**Validação por schema com Zod, nas duas pontas.** No backend, cada linha do CSV passa por um
+schema Zod antes de virar `INSERT` (`co_mun` com 7 dígitos, `ano` no intervalo certo, enums de
+`fonte`/`ensino_rede`/`ensino_tipo`, `valor` numérico). No frontend, o formulário de upload valida
+o arquivo escolhido com outro schema Zod (extensão `.csv`, não vazio, até 30MB) antes mesmo de
+habilitar o botão de enviar — pega erro óbvio de escolha de arquivo sem gastar uma ida ao servidor.
+
 ## Decisões de interface
 
 **Estrutura por feature no frontend.** `src/features/{upload,filtros,indicadores,series,ranking,

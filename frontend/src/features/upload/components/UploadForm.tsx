@@ -2,10 +2,28 @@ import { useState } from 'react';
 import { Card } from '../../../components/Card';
 import { useUpload } from '../hooks/useUpload';
 import { ApiError } from '../../../lib/apiClient';
+import { arquivoCsvSchema } from '../lib/arquivoSchema';
 
 export function UploadForm() {
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [erroValidacao, setErroValidacao] = useState<string | null>(null);
   const upload = useUpload();
+
+  function selecionarArquivo(selecionado: File | null) {
+    if (!selecionado) {
+      setArquivo(null);
+      setErroValidacao(null);
+      return;
+    }
+    const resultado = arquivoCsvSchema.safeParse(selecionado);
+    if (!resultado.success) {
+      setArquivo(null);
+      setErroValidacao(resultado.error.issues[0].message);
+      return;
+    }
+    setArquivo(resultado.data);
+    setErroValidacao(null);
+  }
 
   function enviar() {
     if (!arquivo) return;
@@ -21,7 +39,7 @@ export function UploadForm() {
         <input
           type="file"
           accept=".csv"
-          onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
+          onChange={(e) => selecionarArquivo(e.target.files?.[0] ?? null)}
           className="text-sm text-slate-600 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-800 hover:file:bg-slate-200"
         />
         <button
@@ -33,6 +51,10 @@ export function UploadForm() {
           {upload.isPending ? 'Processando…' : 'Enviar'}
         </button>
       </div>
+
+      {erroValidacao && (
+        <p className="mt-3 rounded bg-red-50 p-3 text-sm text-red-700">{erroValidacao}</p>
+      )}
 
       {upload.isError && (
         <p className="mt-3 rounded bg-red-50 p-3 text-sm text-red-700">
